@@ -1,4 +1,10 @@
 #include<windows.h>
+#include<d3d12.h>
+#include<dxgi1_6.h>
+#include<cassert>
+
+#pragma comment(lib,"d3d12.lib")
+#pragma comment(lib,"dxgi1_6.lib")
 
 // ウィンドウプロシージャ
 LRESULT WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
