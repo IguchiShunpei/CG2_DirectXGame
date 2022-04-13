@@ -65,28 +65,37 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	//DirectX 初期化処理　ここから
 
+	HRESULT result;
+	ID3D12Device* device = nullptr;
+	IDXGIFactory7* dxgiFactory = nullptr;
+	IDXGISwapChain4* swapChain = nullptr;
+	ID3D12CommandAllocator* cmdAllocator = nullptr;
+	ID3D12GraphicsCommandList* CommandList = nullptr;
+	ID3D12CommandQueue* CommandQueue = nullptr;
+	ID3D12DescriptorHeap* rtvHeap = nullptr;
+
 	//DirectX 初期化処理　ここまで
 
-	//ゲームループ
-	while (true)
-	{
-		//メッセージがある？
-		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+		//ゲームループ
+		while (true)
 		{
-			TranslateMessage(&msg);  //キー入力メッセージの処理
-			DispatchMessage(&msg);   //プロシージャにメッセージを送る
+			//メッセージがある？
+			if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+			{
+				TranslateMessage(&msg);  //キー入力メッセージの処理
+				DispatchMessage(&msg);   //プロシージャにメッセージを送る
+			}
+
+			//×ボタンで終了メッセージが来たらゲームループを抜ける
+			if (msg.message == WM_QUIT)
+			{
+				break;
+			}
+
+			//DirectX毎フレーム処理　ここから
+
+			//DirectX毎フレーム処理　ここまで
 		}
-
-		//×ボタンで終了メッセージが来たらゲームループを抜ける
-		if (msg.message == WM_QUIT)
-		{
-			break;
-		}
-
-		//DirectX毎フレーム処理　ここから
-
-		//DirectX毎フレーム処理　ここまで
-	}
 
 	//ウィンドウクラスを登録解除
 	UnregisterClass(w.lpszClassName, w.hInstance);
