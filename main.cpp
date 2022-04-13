@@ -3,6 +3,24 @@
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
 	OutputDebugStringA("Hello,DirectX!!\n");
+	//ウィンドウサイズ
+	const int window_width = 1280; //横
+	const int window_height = 720; //縦
+
+	//ウィンドウクラスの設定
+	WNDCLASSEX w{};
+	w.cbSize = sizeof(WNDCLASSEX);
+	w.lpfnWndProc = (WNDPROC)WindowProc;     //ウィンドウプロシージャを設定
+	w.lpszClassName = L"DirectXGame";		 //ウィンドウクラス名
+	w.hInstance = GetModuleHandle(nullptr);	 //ウィンドウハンドル
+	w.hCursor = LoadCursor(NULL, IDC_ARROW); //カーソル指定
+
+	//ウィンドウクラスをOSに登録する
+	RegisterClassEx(&w);
+	//ウィンドウサイズ{ X座標 Y座標 横幅 立幅 }
+	RECT wrc = { 0,0,window_width,window_height };
+	//自動でサイズを補正する
+	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
 
 	return 0;
 }
