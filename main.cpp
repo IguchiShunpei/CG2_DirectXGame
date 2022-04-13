@@ -243,6 +243,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;  //描画状態へ
 			commandList->ResourceBarrier(1, &barrierDesc);
 
+			//2,描画先の変更
+			//レンダーターゲットビューのハンドルを取得
+			D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
+			rtvHandle.ptr += bbIndex * device->GetDescriptorHandleIncrementSize(rtvHeapDesc.Type);
+			commandList->OMSetRenderTargets(1, &rtvHandle, false, nullptr);
+
+
 			//DirectX毎フレーム処理　ここまで
 		}
 
