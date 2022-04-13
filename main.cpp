@@ -253,16 +253,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			FLOAT clearColor[] = { 0.1f,0.25f,0.5f,0.0f }; //青っぽい色
 			commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);		
 
-			//4,描画コマンド　ここから
+			//4,描画コマンド ここから
 
-			//4,描画コマンド　ここまで
+			//4,描画コマンド ここまで
 
 			//5,リソースバリアを戻す
 			barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET; //描画状態から
 			barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;        //表示状態へ
 			commandList->ResourceBarrier(1, &barrierDesc);
 
-			//DirectX毎フレーム処理　ここまで
+			//DirectX毎フレーム処理 ここまで
 		}
 
 	//ウィンドウクラスを登録解除
