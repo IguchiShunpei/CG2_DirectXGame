@@ -249,6 +249,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			rtvHandle.ptr += bbIndex * device->GetDescriptorHandleIncrementSize(rtvHeapDesc.Type);
 			commandList->OMSetRenderTargets(1, &rtvHandle, false, nullptr);
 
+			//3,画面クリア
+			FLOAT clearColor[] = { 0.1f,0.25f,0.5f,0.0f }; //青っぽい色
+			commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);		
 
 			//DirectX毎フレーム処理　ここまで
 		}
