@@ -213,8 +213,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		result = device->CreateFence(fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
 	}
 	
-
-
 	//DirectX 初期化処理　ここまで
 
 		//ゲームループ
@@ -234,6 +232,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			}
 
 			//DirectX毎フレーム処理　ここから
+
+			//バックバッファの番号を取得(2つなので0番か1番)
+			UINT bbIndex = swapChain->GetCurrentBackBufferIndex();
+
+			//1,リソースバリアで書き込み可能に変更
+			D3D12_RESOURCE_BARRIER barrierDesc{};
+			barrierDesc.Transition.pResource = backBuffers[bbIndex];                 //バックバッファを指定
+			barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;       //表示状態から
+			barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;  //描画状態へ
+			commandList->ResourceBarrier(1, &barrierDesc);
 
 			//DirectX毎フレーム処理　ここまで
 		}
