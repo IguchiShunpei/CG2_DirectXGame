@@ -8,6 +8,7 @@
 #include<d3dcompiler.h>
 #include<DirectXMath.h>
 #include<dinput.h>
+#include<DirectXTex.h>
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
@@ -248,26 +249,87 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	//描画初期化処理  ここから
 
-	//横方向ピクセル数
-	const size_t textureWidth = 256;
-
-	//縦方向ピクセル数
-	const size_t textureHeight = 256;
-
-	//配列の要素数
-	const size_t imageDataCount = textureWidth * textureHeight;
-
-	//画像イメージデータ配列
-	XMFLOAT4* imageData = new XMFLOAT4[imageDataCount];
-
-	//全ピクセルの色を初期化
-	for (size_t i = 0; i < imageDataCount; i++)
+	//頂点データ構造体
+	struct Vertex
 	{
-		imageData[i].x = 0.0f; // R
-		imageData[i].y = 1.0f; // G
-		imageData[i].z = 0.0f; // B
-		imageData[i].w = 1.0f; // A
+		XMFLOAT3 pos; //xyz座標
+
+		XMFLOAT2 uv;  //uv座標
+	};
+
+	//頂点データ
+	Vertex vertices[] = {
+		{{-0.4f,-0.7f,0.0f},{0.0f,1.0f,}},//左下  インデックス0
+		{{-0.4f,+0.7f,0.0f},{0.0f,0.0f,}},//左上  インデックス1
+		{{+0.4f,-0.7f,0.0f},{1.0f,1.0f,}},//右下  インデックス2
+		{{+0.4f,+0.7f,0.0f},{1.0f,0.0f,}},//右上  インデックス3
+	};
+
+	//インデックスデータ
+	unsigned short indices[] =
+	{
+		0,1,2,  //三角形1つ目
+		1,2,3,  //三角形2つ目
+	};
+
+	//頂点データの全体のサイズ = 頂点データ一つ分のサイズ * 頂点データの要素数
+	UINT sizeVB = static_cast<UINT>(sizeof(vertices[0]) * _countof(vertices));
+
+	//四角形のイメージデータ
+	////横方向ピクセル数
+	//const size_t textureWidth = 256;
+
+	////縦方向ピクセル数
+	//const size_t textureHeight = 256;
+
+	////配列の要素数
+	//const size_t imageDataCount = textureWidth * textureHeight;
+
+	////画像イメージデータ配列
+	//XMFLOAT4* imageData = new XMFLOAT4[imageDataCount];
+
+	////全ピクセルの色を初期化
+	//for (size_t i = 0; i < imageDataCount; i++)
+	//{
+	//	imageData[i].x = 0.0f; // R
+	//	imageData[i].y = 1.0f; // G
+	//	imageData[i].z = 0.0f; // B
+	//	imageData[i].w = 1.0f; // A
+	//}
+
+	//画像読み込み
+	TexMetadata metadata{};
+	ScratchImage scratchImg{};
+	//WICテクスチャのロード
+	result = LoadFromWICFile
+	(
+		L"Resources/texture.jpg",
+		WIC_FLAGS_NONE,
+		&metadata, scratchImg
+	);
+
+	ScratchImage mipChain{};
+
+	//ミップマップ生成
+
+	result = GenerateMipMaps
+	(
+		scratchImg.GetImages(),
+		scratchImg.GetImageCount(),
+		scratchImg.GetMetadata(),
+		TEX_FILTER_DEFAULT,
+		0,
+		mipChain
+	);
+
+	if (SUCCEEDED(result))
+	{
+		scratchImg = std::move(mipChain);
+		metadata = scratchImg.GetMetadata();
 	}
+
+	//読み込んだディフューズテクスチャをSRGBとして扱う
+	metadata.format = MakeSRGB(metadata.format);
 
 	//ヒープ設定
 	D3D12_HEAP_PROPERTIES textureHeapProp{};
@@ -275,16 +337,30 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	textureHeapProp.CPUPageProperty =
 		D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
 	textureHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+
 	//リソース設定
 	D3D12_RESOURCE_DESC textureResourceDesc{};
 	textureResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-textureResourceDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT; 
-textureResourceDesc.Width = textureWidth;  //幅
-	textureResourceDesc.Height = textureWidth;//高さ
-	textureResourceDesc.DepthOrArraySize = 1;
-	textureResourceDesc.MipLevels = 1;
+	textureResourceDesc.Format = metadata.format;
+	textureResourceDesc.Width = metadata.width;  //幅
+	textureResourceDesc.Height = (UINT)metadata.height;//高さ
+	textureResourceDesc.DepthOrArraySize = (UINT16)metadata.arraySize;
+	textureResourceDesc.MipLevels = (UINT16)metadata.mipLevels;
 	textureResourceDesc.SampleDesc.Count = 1;
 
+	//頂点バッファの設定
+	D3D12_HEAP_PROPERTIES heapProp{};        //ヒープ設定
+	heapProp.Type = D3D12_HEAP_TYPE_UPLOAD;  //GPUへの転送用
+
+	//リソース設定
+	D3D12_RESOURCE_DESC resDesc{};
+	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resDesc.Width = sizeVB; //頂点データ全体のサイズ
+	resDesc.Height = 1;
+	resDesc.DepthOrArraySize = 1;
+	resDesc.MipLevels = 1;
+	resDesc.SampleDesc.Count = 1;
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
 	//テクスチャバッファの生成
 	ID3D12Resource* texBuff = nullptr;
@@ -298,15 +374,22 @@ textureResourceDesc.Width = textureWidth;  //幅
 		IID_PPV_ARGS(&texBuff)
 	);
 
-	//テクスチャバッファにデータ転送
-	result = texBuff->WriteToSubresource
-	(
-		0,
-		nullptr,//全領域へコピー
-		imageData, //元データアドレス
-		sizeof(XMFLOAT4) * textureWidth,//1ラインサイズ
-		sizeof(XMFLOAT4) * imageDataCount//全サイズ
-	);
+	//全ミップマップについて
+	for (size_t i = 0; i < metadata.mipLevels; i++)
+	{
+		//ミップマップレベルを指定してイメージを取得
+		const Image* img = scratchImg.GetImage(i, 0, 0);
+		//テクスチャバッファにデータ転送
+		result = texBuff->WriteToSubresource
+		(
+			(UINT)i,
+			nullptr,			   //全領域へコピー
+			img->pixels,		   //元データアドレス
+			(UINT)img->rowPitch,   //1ラインサイズ
+			(UINT)img->slicePitch  //1枚サイズ
+		);
+		assert(SUCCEEDED(result));
+	}
 
 	//SRVの最大個数
 	const size_t kMaxSRVCount = 2056;
@@ -328,11 +411,11 @@ textureResourceDesc.Width = textureWidth;  //幅
 
 	//シェーダーリソースビュー設定
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};//設定構造体
-	srvDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;//RGBA float
+	srvDesc.Format = resDesc.Format;
 	srvDesc.Shader4ComponentMapping =
 		D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;//2Dテクスチャ
-	srvDesc.Texture2D.MipLevels = 1;
+	srvDesc.Texture2D.MipLevels = resDesc.MipLevels;
 
 	//ハンドルの指す位置にシェーダーリソースビュー作成
 	device->CreateShaderResourceView(texBuff, &srvDesc, srvHandle);
@@ -422,46 +505,6 @@ textureResourceDesc.Width = textureWidth;  //幅
 	samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
 	samplerDesc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;           //ピクセルシェーダ空のみ使用可能
 
-	//頂点データ構造体
-	struct Vertex
-	{
-		XMFLOAT3 pos; //xyz座標
-
-		XMFLOAT2 uv;  //uv座標
-	};
-
-	//頂点データ
-	Vertex vertices[] = {
-		{{-0.4f,-0.7f,0.0f},{0.0f,1.0f,}},//左下  インデックス0
-		{{-0.4f,+0.7f,0.0f},{0.0f,0.0f,}},//左上  インデックス1
-		{{+0.4f,-0.7f,0.0f},{1.0f,0.0f,}},//右下  インデックス2
-		{{+0.4f,+0.7f,0.0f},{1.0f,0.0f,}},//右上  インデックス3
-	};
-
-	//インデックスデータ
-	unsigned short indices[] =
-	{
-		0,1,2,  //三角形1つ目
-		1,2,3,  //三角形2つ目
-	};
-
-	//頂点データの全体のサイズ = 頂点データ一つ分のサイズ * 頂点データの要素数
-	UINT sizeVB = static_cast<UINT>(sizeof(vertices[0]) * _countof(vertices));
-
-	//頂点バッファの設定
-	D3D12_HEAP_PROPERTIES heapProp{};        //ヒープ設定
-	heapProp.Type = D3D12_HEAP_TYPE_UPLOAD;  //GPUへの転送用
-
-	//リソース設定
-	D3D12_RESOURCE_DESC resDesc{};
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resDesc.Width = sizeVB; //頂点データ全体のサイズ
-	resDesc.Height = 1;
-	resDesc.DepthOrArraySize = 1;
-	resDesc.MipLevels = 1;
-	resDesc.SampleDesc.Count = 1;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
 	//頂点バッファの作成
 	ID3D12Resource* vertBuff = nullptr;
 	result = device->CreateCommittedResource
@@ -502,6 +545,7 @@ textureResourceDesc.Width = textureWidth;  //幅
 	//インデックスバッファをマッピング
 	uint16_t* indexMap = nullptr;
 	result = indexBuff->Map(0, nullptr, (void**)&indexMap);
+
 	//全インデックスに対して
 	for (int i = 0; i < _countof(indices); i++)
 	{
@@ -776,7 +820,7 @@ textureResourceDesc.Width = textureWidth;  //幅
 		//SRVヒープの設定コマンド
 		commandList->SetDescriptorHeaps(1, &srvHeap);
 		//SRVヒープの先頭ハンドルを取得(SRVを指しているはず)
-		D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle = 
+		D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle =
 			srvHeap->GetGPUDescriptorHandleForHeapStart();
 		//SRVヒープの先頭にあるSRVをルートパラメータ1番に設定
 		commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
