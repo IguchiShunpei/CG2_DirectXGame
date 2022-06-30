@@ -259,10 +259,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	//頂点データ
 	Vertex vertices[] = {
-		{{-50.0f,-50.0f,50.0f},{0.0f,1.0f,}},//左下  インデックス0
-		{{-50.0f, 50.0f,50.0f},{0.0f,0.0f,}},//左上  インデックス1
-		{{ 50.0f,-50.0f,50.0f},{1.0f,1.0f,}},//右下  インデックス2
-		{{ 50.0f, 50.0f,50.0f},{1.0f,0.0f,}},//右上  インデックス3
+		{{-50.0f,-50.0f,0.0f},{0.0f,1.0f,}},//左下  インデックス0
+		{{-50.0f, 50.0f,0.0f},{0.0f,0.0f,}},//左上  インデックス1
+		{{ 50.0f,-50.0f,0.0f},{1.0f,1.0f,}},//右下  インデックス2
+		{{ 50.0f, 50.0f,0.0f},{1.0f,0.0f,}},//右上  インデックス3
 	};
 
 	//インデックスデータ
@@ -535,8 +535,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		0.1f,1000.0f
 		);
 
+		//ビュー変換行列
+		XMMATRIX matView;
+		XMFLOAT3    eye(0, 100, -100);  //視点座標
+		XMFLOAT3 target(0, 0,    0);  //注視点座標
+		XMFLOAT3     up(0, 1,    0);  //上方向ベクトル
 
-		constMapTransform->mat = matProjection;
+		matView = XMMatrixLookAtLH(
+			XMLoadFloat3(&eye),     //どこから見ているか
+			XMLoadFloat3(&target),	//どこを見ているか
+			XMLoadFloat3(&up));		//カメラから見た上はどういう向きか
+
+		float angle = 0.0f; //カメラの回転角
+
+		constMapTransform->mat = matView * matProjection;
 
 	//ルートパラメータの設定
 	D3D12_ROOT_PARAMETER rootParams[3] = {};
@@ -846,6 +858,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		}
 
 		commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+
+		//カメラアングル変更
+		if (key[DIK_D] || key[DIK_A])
+		{
+			     if (key[DIK_D]) { angle += XMConvertToRadians(1.0f); }
+		    else if (key[DIK_A]) { angle -= XMConvertToRadians(1.0f); }
+
+		    //angleラジアンだけY軸周りに回転。半径は-100
+				 eye.x = -100 * sinf(angle);
+				 eye.z = -100 * cosf(angle);
+
+				 matView = XMMatrixLookAtLH(
+					 XMLoadFloat3(&eye),     //どこから見ているか
+					 XMLoadFloat3(&target),	//どこを見ているか
+					 XMLoadFloat3(&up));		//カメラから見た上はどういう向きか
+		}
+
+		constMapTransform->mat = matView * matProjection;
 
 		//DirectX毎フレーム処理　ここまで
 
