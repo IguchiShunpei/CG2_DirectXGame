@@ -499,56 +499,70 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		cbResourceDesc.Width = (sizeof(ConstBufferDataTransform) + 0xff) & ~0xff; //256バイトアラインメント
 		cbResourceDesc.Height = 1;
 		cbResourceDesc.DepthOrArraySize = 1;
-		cbResourceDesc.MipLevels = 1; 
+		cbResourceDesc.MipLevels = 1;
 		cbResourceDesc.SampleDesc.Count = 1;
 		cbResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
 	}
-		//定数バッファの生成
-		result = device->CreateCommittedResource(
-			&cbHeapProp,
-			D3D12_HEAP_FLAG_NONE,
-			&cbResourceDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&constBuffTransform));
-		assert(SUCCEEDED(result));
+	//定数バッファの生成
+	result = device->CreateCommittedResource(
+		&cbHeapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&cbResourceDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&constBuffTransform));
+	assert(SUCCEEDED(result));
 
-		//定数バッファのマッピング
-		result = constBuffTransform->Map(0, nullptr, (void**)&constMapTransform);  //マッピング
-		assert(SUCCEEDED(result));
+	//定数バッファのマッピング
+	result = constBuffTransform->Map(0, nullptr, (void**)&constMapTransform);  //マッピング
+	assert(SUCCEEDED(result));
 
-		//単位行列を代入
-		constMapTransform->mat = XMMatrixIdentity();
+	//単位行列を代入
+	constMapTransform->mat = XMMatrixIdentity();
 
-		//平行投影変換の計算
-		constMapTransform->mat = XMMatrixOrthographicOffCenterLH(
-	    	  0.0f, window_width,
-			window_height,  0.0f,
-	    	  0.0f,  1.0f);
-		
-		//射影変換行列(透視投影)
-		XMMATRIX matProjection =
+	//平行投影変換の計算
+	constMapTransform->mat = XMMatrixOrthographicOffCenterLH(
+		0.0f, window_width,
+		window_height, 0.0f,
+		0.0f, 1.0f);
+
+	//射影変換行列(透視投影)
+	XMMATRIX matProjection =
 		XMMatrixPerspectiveFovLH(
-		XMConvertToRadians(45.0f),
-		(float)window_width/ window_height,
-		0.1f,1000.0f
+			XMConvertToRadians(45.0f),
+			(float)window_width / window_height,
+			0.1f, 1000.0f
 		);
 
-		//ビュー変換行列
-		XMMATRIX matView;
-		XMFLOAT3    eye(0, 100, -100);  //視点座標
-		XMFLOAT3 target(0, 0,    0);  //注視点座標
-		XMFLOAT3     up(0, 1,    0);  //上方向ベクトル
+	//ビュー変換行列
+	float angle = 0.0f; //カメラの回転角
+	XMMATRIX matView;
+	XMFLOAT3    eye(0, 0, -100);  //視点座標
+	XMFLOAT3 target(0, 0, 0);  //注視点座標
+	XMFLOAT3     up(0, 1, 0);  //上方向ベクトル
 
-		matView = XMMatrixLookAtLH(
-			XMLoadFloat3(&eye),     //どこから見ているか
-			XMLoadFloat3(&target),	//どこを見ているか
-			XMLoadFloat3(&up));		//カメラから見た上はどういう向きか
+	matView = XMMatrixLookAtLH(
+		XMLoadFloat3(&eye),     //どこから見ているか
+		XMLoadFloat3(&target),	//どこを見ているか
+		XMLoadFloat3(&up));		//カメラから見た上はどういう向きか
 
-		float angle = 0.0f; //カメラの回転角
+	//ワールド変換行列
+	// スケーリング倍率
+	XMFLOAT3 scale;
+	// 回転角
+	XMFLOAT3 rotation;
+	//座標
+	XMFLOAT3 position;
 
-		constMapTransform->mat = matView * matProjection;
+	scale = { 1.0f,1.0f,1.0f };
+	rotation = { 0.0f,0.0f,0.0f };
+	position = { 0.0f,0.0f,0.0f };
+
+	XMMATRIX matWorld;
+
+	//行列を合成
+	constMapTransform->mat = matWorld * matView * matProjection;
 
 	//ルートパラメータの設定
 	D3D12_ROOT_PARAMETER rootParams[3] = {};
@@ -859,23 +873,52 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 		commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
+		//ビュー行列の計算
 		//カメラアングル変更
 		if (key[DIK_D] || key[DIK_A])
 		{
-			     if (key[DIK_D]) { angle += XMConvertToRadians(1.0f); }
-		    else if (key[DIK_A]) { angle -= XMConvertToRadians(1.0f); }
+			if (key[DIK_D]) { angle += XMConvertToRadians(1.0f); }
+			else if (key[DIK_A]) { angle -= XMConvertToRadians(1.0f); }
 
-		    //angleラジアンだけY軸周りに回転。半径は-100
-				 eye.x = -100 * sinf(angle);
-				 eye.z = -100 * cosf(angle);
+			//angleラジアンだけY軸周りに回転。半径は-100
+			eye.x = -100 * sinf(angle);
+			eye.z = -100 * cosf(angle);
 
-				 matView = XMMatrixLookAtLH(
-					 XMLoadFloat3(&eye),     //どこから見ているか
-					 XMLoadFloat3(&target),	//どこを見ているか
-					 XMLoadFloat3(&up));		//カメラから見た上はどういう向きか
+			matView = XMMatrixLookAtLH(
+				XMLoadFloat3(&eye),     //どこから見ているか
+				XMLoadFloat3(&target),	//どこを見ているか
+				XMLoadFloat3(&up));		//カメラから見た上はどういう向きか
 		}
 
-		constMapTransform->mat = matView * matProjection;
+		//いずれかのキーを押していたら
+		if (key[DIK_UP] || key[DIK_DOWN] || key[DIK_RIGHT] || key[DIK_LEFT])
+		{
+			//座標を移動する処理(Z座標)
+			if (key[DIK_UP]) { position.z += 1.0f; }
+			else if (key[DIK_DOWN]) { position.z -= 1.0f; }
+			if (key[DIK_RIGHT]) { position.x += 1.0f; }
+			else if (key[DIK_LEFT]) { position.x -= 1.0f; }
+		}
+
+		XMMATRIX matScale; //スケーリング行列
+		matScale = XMMatrixScaling(scale.x, scale.y, scale.z);
+
+		XMMATRIX matRot; //回転行列
+		matRot = XMMatrixIdentity();
+		matRot *= XMMatrixRotationZ(rotation.z);  //Z軸周りに回転してから
+		matRot *= XMMatrixRotationX(rotation.x); //X軸周りに回転してから
+		matRot *= XMMatrixRotationY(rotation.y); //Y軸周りに回転
+
+		XMMATRIX matTrans; //平行移動行列
+		matTrans = XMMatrixTranslation(position.x, position.y, position.z);
+
+		matWorld = XMMatrixIdentity();//変形をリセット
+		matWorld *= matScale;//ワールド行列にスケーリングを反映
+		matWorld *= matRot; //ワールド行列に回転を反映
+		matWorld *= matTrans; //ワールド行列に平行移動を反映
+
+		//行列を合成して定数バッファに転送
+		constMapTransform->mat = matWorld * matView * matProjection;
 
 		//DirectX毎フレーム処理　ここまで
 
