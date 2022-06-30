@@ -259,10 +259,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	//頂点データ
 	Vertex vertices[] = {
-		{{  0.0f,100.0f,0.0f},{0.0f,1.0f,}},//左下  インデックス0
-		{{  0.0f,  0.0f,0.0f},{0.0f,0.0f,}},//左上  インデックス1
-		{{100.0f,100.0f,0.0f},{1.0f,1.0f,}},//右下  インデックス2
-		{{100.0f,0.0f,0.0f},{1.0f,0.0f,}},//右上  インデックス3
+		{{-50.0f,-50.0f,50.0f},{0.0f,1.0f,}},//左下  インデックス0
+		{{-50.0f, 50.0f,50.0f},{0.0f,0.0f,}},//左上  インデックス1
+		{{ 50.0f,-50.0f,50.0f},{1.0f,1.0f,}},//右下  インデックス2
+		{{ 50.0f, 50.0f,50.0f},{1.0f,0.0f,}},//右上  インデックス3
 	};
 
 	//インデックスデータ
@@ -521,13 +521,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		//単位行列を代入
 		constMapTransform->mat = XMMatrixIdentity();
 
-		//中心座標を変換
-		constMapTransform->mat.r[0].m128_f32[0] = 2.0f / window_width;
-		constMapTransform->mat.r[1].m128_f32[1] = -2.0f / window_height;
+		//平行投影変換の計算
+		constMapTransform->mat = XMMatrixOrthographicOffCenterLH(
+	    	  0.0f, window_width,
+			window_height,  0.0f,
+	    	  0.0f,  1.0f);
+		
+		//射影変換行列(透視投影)
+		XMMATRIX matProjection =
+		XMMatrixPerspectiveFovLH(
+		XMConvertToRadians(45.0f),
+		(float)window_width/ window_height,
+		0.1f,1000.0f
+		);
 
-		//中心座標を左上にずらす
-		constMapTransform->mat.r[3].m128_f32[0] = -1.0f;
-		constMapTransform->mat.r[3].m128_f32[1] = 1.0f;
+
+		constMapTransform->mat = matProjection;
 
 	//ルートパラメータの設定
 	D3D12_ROOT_PARAMETER rootParams[3] = {};
