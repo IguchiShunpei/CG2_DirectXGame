@@ -302,29 +302,29 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//インデックスデータ
 	unsigned short indices[] =
 	{
-	   //前
-		0,1,2,  //三角形1つ目
-		2,1,3,  //三角形2つ目
+		//前
+		 0,1,2,  //三角形1つ目
+		 2,1,3,  //三角形2つ目
 
-		//後ろ
-		6,5,4,  //三角形3つ目
-		7,5,6,	//三角形4つ目
+		 //後ろ
+		 6,5,4,  //三角形3つ目
+		 7,5,6,	//三角形4つ目
 
-		//左
-		9,10,8,  //三角形5つ目
-		11,10,9,  //三角形6つ目 
+		 //左
+		 9,10,8,  //三角形5つ目
+		 11,10,9,  //三角形6つ目 
 
-		//右
-		12,14,13,  //三角形7つ目
-		13,14,15,  //三角形8つ目
-		
-		//上
-		16,18,17,  //三角形9つ目
-		17,18,19,  //三角形10個目
+		 //右
+		 12,14,13,  //三角形7つ目
+		 13,14,15,  //三角形8つ目
 
-		//下
-		21,22,20,  //三角形11個目
-		23,22,21,  //三角形12個目
+		 //上
+		 16,18,17,  //三角形9つ目
+		 17,18,19,  //三角形10個目
+
+		 //下
+		 21,22,20,  //三角形11個目
+		 23,22,21,  //三角形12個目
 	};
 
 	//頂点データの全体のサイズ = 頂点データ一つ分のサイズ * 頂点データの要素数
@@ -707,6 +707,36 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	ibView.Format = DXGI_FORMAT_R16_UINT;
 	ibView.SizeInBytes = sizeIB;
 
+	for (int i = 0; i < indices[24] / 3; i++)
+	{
+		//三角形1つごとに計算していく
+		//三角形のインデックスを取り出して、一時的な変数に入れる
+		unsigned short index0 = indices[i * 3 + 0];
+		unsigned short index1 = indices[i * 3 + 1];
+		unsigned short index2 = indices[i * 3 + 2];
+
+		//三角形を構成する頂点座標をベクトルに代入
+		XMVECTOR p0 = XMLoadFloat3(&vertices[index0].pos);
+		XMVECTOR p1 = XMLoadFloat3(&vertices[index1].pos);
+		XMVECTOR p2 = XMLoadFloat3(&vertices[index2].pos);
+
+		//p0→p1ベクトル、p0→p2ベクトルを計算　(ベクトルの減算)
+		XMVECTOR v1 = XMVectorSubtract(p0, p1);
+		XMVECTOR v2 = XMVectorSubtract(p0, p2);
+
+		//外積は両方から垂直なベクトル
+		XMVECTOR normal = XMVector3Cross(v1, v2);
+
+		//正規化(長さを1にする)
+		normal = XMVector3Normalize(normal);
+
+		//求めた法線を頂点データに代入
+		XMStoreFloat3(&vertices[index0].normal, normal);
+		XMStoreFloat3(&vertices[index1].normal, normal);
+		XMStoreFloat3(&vertices[index2].normal, normal);
+	}
+
+	//頂点バッファへのデータ転送
 	//GPU上のバッファに対応した仮想メモリ(メインメモリ上)を取得
 	Vertex* vertMap = nullptr;
 	result = vertBuff->Map(0, nullptr, (void**)&vertMap);
@@ -814,7 +844,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		},
 	};
 
-    //リソース設定
+	//リソース設定
 	D3D12_RESOURCE_DESC depthResourceDesc{};
 	depthResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 	depthResourceDesc.Width = window_width;    //レンダーターゲットに合わせる
@@ -973,7 +1003,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		//レンダーターゲットビューのハンドルを取得
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
 		rtvHandle.ptr += bbIndex * device->GetDescriptorHandleIncrementSize(rtvHeapDesc.Type);
-		
+
 		//深度ステンシルビュー用デスクリプタヒープのハンドルを取得
 		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
 		commandList->OMSetRenderTargets(1, &rtvHandle, false, &dsvHandle);
@@ -990,7 +1020,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		}
 
 		commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-		commandList->ClearDepthStencilView(dsvHandle,D3D12_CLEAR_FLAG_DEPTH,1.0f,0,0,nullptr);
+		commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 		//ビュー行列の計算
 		//カメラアングル変更
