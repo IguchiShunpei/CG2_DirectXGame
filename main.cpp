@@ -438,6 +438,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	BYTE oldkeys[256] = {};
 	//カメラアングル
 	float angle = 0.0f;
+	float distance = 100.f;
 
 	//座標
 	XMFLOAT3 scale;
@@ -629,7 +630,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	//ビュー変換行列
 	XMMATRIX matView;
 
-	XMFLOAT3 eye(0, 0, -150);//視点座標
+	XMFLOAT3 eye(0, 0, -100);//視点座標
 	XMFLOAT3 target(0, 0, 0);//注視点座標
 	XMFLOAT3 up(0, 1, 0);//上方向ベクトル
 	//ビュー変換行列の計算
@@ -693,7 +694,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	ScratchImage scratchImg{};
 
 	result = LoadFromWICFile(
-		L"Resources/mario.jpg",
+		L"Resources/DragonMachine.jpg",
 		WIC_FLAGS_NONE,
 		&metaData, scratchImg
 	);
@@ -1041,6 +1042,32 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	D3D12_RENDER_TARGET_BLEND_DESC& blenddesc = pipelineDesc.BlendState.RenderTarget[0];
 	blenddesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 
+	//共通設定
+	blenddesc.BlendEnable    = true;
+	blenddesc.BlendOpAlpha   = D3D12_BLEND_OP_ADD;//加算
+	blenddesc.SrcBlendAlpha  = D3D12_BLEND_ONE;//ソースの値を100%使う
+	blenddesc.DestBlendAlpha = D3D12_BLEND_ZERO;//ソースの値を0%使う
+
+	//	加算合成
+	blenddesc.BlendOp   = D3D12_BLEND_OP_ADD;//加算
+	blenddesc.SrcBlend  = D3D12_BLEND_ONE;//ソースの値を100%使う
+	blenddesc.DestBlend = D3D12_BLEND_ONE;//ソースの値を100%使う
+
+	//減算合成
+	blenddesc.BlendOp = D3D12_BLEND_OP_REV_SUBTRACT;//テストからソースを減算
+	blenddesc.SrcBlend = D3D12_BLEND_ONE;//ソースの値を100%使う
+	blenddesc.DestBlend = D3D12_BLEND_ONE;//ソースの値を100%使う
+
+	//色反転
+	blenddesc.BlendOp = D3D12_BLEND_OP_ADD;//加算
+	blenddesc.SrcBlend = D3D12_BLEND_INV_DEST_COLOR;//1.0f-デストカラーの値
+	blenddesc.DestBlend = D3D12_BLEND_ZERO;//使わない
+
+	//半透明
+	blenddesc.BlendOp = D3D12_BLEND_OP_ADD;//加算
+	blenddesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;//ソースのアルファ値
+	blenddesc.DestBlend = D3D12_BLEND_SRC_ALPHA;//1.0f-ソースのアルファ値
+
 	//頂点レイアウトの設定
 	pipelineDesc.InputLayout.pInputElementDescs = inputLayout;
 	pipelineDesc.InputLayout.NumElements = _countof(inputLayout);
@@ -1082,7 +1109,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	assert(SUCCEEDED(result));
 
 	//描画初期化処理  ここまで
-		//ゲームループ
+
+	//色(RGB)
+	float red = 0.0f;
+	float green = 1.0f;
+	float blue = 0.0f;
+	float alpha = 1.0f;
+	//色の変化量
+	float colorChangeValue = 0.005f;
+	//変化フラグ
+	int changePhase = 0;
+
+	//ゲームループ
 	while (true)
 	{
 		//メッセージがある？
@@ -1146,6 +1184,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 		commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
+		//アルファ値を変更
+		if (key[DIK_O] || key[DIK_P])
+		{
+			if (key[DIK_O]) { alpha = 1; }
+			else if (key[DIK_P]) { alpha = 0.1; }
+		}
+
 		//ビュー行列の計算
 		//カメラアングル変更
 		if (key[DIK_D] || key[DIK_A])
@@ -1154,8 +1199,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			else if (key[DIK_A]) { angle -= XMConvertToRadians(1.0f); }
 
 			//angleラジアンだけY軸周りに回転。半径は-100
-			eye.x = -100 * sinf(angle);
-			eye.z = -100 * cosf(angle);
+			eye.x = -distance * sinf(angle);
+			eye.z = -distance * cosf(angle);
 
 			matView = XMMatrixLookAtLH(
 				XMLoadFloat3(&eye),     //どこから見ているか
@@ -1163,18 +1208,78 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 				XMLoadFloat3(&up));		//カメラから見た上はどういう向きか
 		}
 
+		//回転
+		//X軸
+		if (key[DIK_U] || key[DIK_I])
+		{
+			if (key[DIK_U]) { object3ds[0].rotation.x += 0.1f; }
+			else if (key[DIK_I]) { object3ds[0].rotation.x-= 0.1f; }
+		}
+		//Y軸
+		if (key[DIK_J] || key[DIK_K])
+		{
+			if (key[DIK_J]) { object3ds[0].rotation.y += 0.1f; }
+			else if (key[DIK_K]) { object3ds[0].rotation.y -= 0.1f; }
+		}
+		//Z軸
+		if (key[DIK_N] || key[DIK_M])
+		{
+			if (key[DIK_N]) { object3ds[0].rotation.z += 0.1f; }
+			else if (key[DIK_M]) { object3ds[0].rotation.z -= 0.1f; }
+		}
+		//移動
 		if (key[DIK_UP] || key[DIK_DOWN] || key[DIK_RIGHT] || key[DIK_LEFT])
 		{
 			if (key[DIK_UP]) { object3ds[0].position.y += 1.0f; }
-			else if	(key[DIK_DOWN]){ object3ds[0].position.y -= 1.0f; }
-			if	(key[DIK_RIGHT]){ object3ds[0].position.x += 1.0f; }
-			else if	(key[DIK_LEFT]){ object3ds[0].position.x -= 1.0f; }
+			else if (key[DIK_DOWN]) { object3ds[0].position.y -= 1.0f; }
+			if (key[DIK_RIGHT]) { object3ds[0].position.x += 1.0f; }
+			else if (key[DIK_LEFT]) { object3ds[0].position.x -= 1.0f; }
 		}
 
 		for (size_t i = 0; i < _countof(object3ds); i++)
 		{
 			UpdateObject3d(&object3ds[i], matView, matProjection);
 		}
+
+		//色が変化する処理
+		//緑→青
+		if (changePhase == 0)
+		{
+			green -= colorChangeValue;
+			blue += colorChangeValue;
+			if (green <= 0)
+			{
+				green = 0;
+				blue = 1;
+				changePhase = 1;
+			}
+		}
+		//青→赤
+		else if (changePhase == 1)
+		{
+			blue -= colorChangeValue;
+			red += colorChangeValue;
+			if (blue <= 0)
+			{
+				blue = 0;
+				red = 1;
+				changePhase = 2;
+			}
+		}
+		//赤→緑
+		else if (changePhase == 2)
+		{
+			green += colorChangeValue;
+			red -= colorChangeValue;
+			if (red <= 0)
+			{
+				green = 1;
+				red = 0;
+				changePhase = 0;
+			}
+		}
+
+		constMapMaterial->color = { red,green,blue,alpha};
 
 		//DirectX毎フレーム処理　ここまで
 
@@ -1237,6 +1342,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		{
 			DrawObject3d(&object3ds[i], commandList, vbView, ibView, _countof(indices));
 		}
+		
 		//4,描画コマンド ここまで
 
 		//5,リソースバリアを戻す
